@@ -1,34 +1,32 @@
-use actix_web::{get, web, Responder, Result};
-use serde::{Deserialize, Serialize};
+use actix_web::{App, HttpServer};
+use sqlx::{postgres::PgConnection, Connection};
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct TodoItem {
-    id: String,
-    first_name: String,
-    last_name: String,
-    description: String,
-    time: String,
-}
+use crate::api::get_todos;
 
-#[get("/todos")]
-async fn get_todos() -> Result<impl Responder> {
-    let mut items: Vec<TodoItem> = vec![];
-    for i in 1..=3 {
-        items.push(TodoItem {
-            id: format!("{}", i),
-            first_name: "Alistair".into(),
-            last_name: "Foggin".into(),
-            description: format!("Todo item number {}", i),
-            time: "".into(),
-        })
-    }
-    Ok(web::Json(items))
+mod api;
+mod db;
+mod types;
+
+#[derive(sqlx::FromRow, Debug)]
+struct User {
+    userid: String,
+    firstname: String,
+    lastname: String,
 }
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    use actix_web::{App, HttpServer};
+    // let pool = PgPoolOptions::new()
+    //     .max_connections(5)
+    //     .connect("postgres://postgres:password@localhost/test").await.unwrap();
+    let mut conn = PgConnection::connect("postgres://postgres:password@localhost")
+        .await
+        .unwrap();
+
+    let rows = sqlx::query_as::<_, User>("SELECT * FROM users").fetch_all(&mut conn).await.unwrap();
+    for row in rows {
+        println!("{:?}", row);
+    }
 
     HttpServer::new(|| App::new().service(get_todos))
         .bind(("127.0.0.1", 8080))?
